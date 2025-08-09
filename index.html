@@ -10,7 +10,7 @@
 <style>
   :root{ --bg:#0f1220; --panel:#171a2b; --accent:#6ee7ff; --accent2:#a78bfa; --ok:#34d399; --text:#e6e6f0; }
   *{box-sizing:border-box}
-  body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Arial,sans-serif;background:radial-gradient(1000px 600px at 20% -10%, #1b2040, transparent),var(--bg);color:var(--text);}
+  body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Arial,sans-serif;background:radial-gradient(1000px 600px at 20% -10%, #1b2040, transparent),var(--bg);color:#e6e6f0}
   header{padding:16px 20px;border-bottom:1px solid #282b45;background:linear-gradient(180deg,#171a2b 0%, #111427 100%);position:sticky;top:0;z-index:10}
   header h1{margin:0;font-size:18px;display:flex;align-items:center;gap:10px}
   .grid{display:grid;grid-template-columns:repeat(12,1fr);gap:14px}
@@ -21,7 +21,7 @@
   label{display:block;font-size:12px;color:#a6aacf;margin:0 0 6px 2px}
   input[type="range"]{width:100%}
   input[type="number"], select{width:100%;background:#0f1330;border:1px solid #2a2f54;color:#e6e6f0;border-radius:10px;padding:10px 12px}
-  .btn{cursor:pointer;border:1px solid #2a2f54;background:linear-gradient(180deg,#232848,#1a1f3d);color:#fff;border-radius:12px;padding:10px 14px;font-weight:600;display:inline-flex;align-items:center;gap:10px;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+  .btn{cursor:pointer;border:1px solid #2a2f54;background:linear-gradient(180deg,#232848,#1a1f3d);color:#fff;border-radius:12px;padding:10px 14px;font-weight:600;display:inline-flex;align-items:center;gap:10px;-webkit-tap-highlight-color:transparent;touch-action:manipulation;-webkit-user-select:none;user-select:none}
   .btn:active{transform:translateY(1px)}
   .btn--primary{border-color:#35b6e6;background:linear-gradient(180deg,#30a2d1,#1c6686)}
   .btn--danger{border-color:#ef4444;background:linear-gradient(180deg,#ef4444,#991b1b)}
@@ -33,16 +33,16 @@
   .flash{width:12px;height:12px;border-radius:50%;background:#334155;box-shadow:0 0 0 0 rgba(52,211,153,0);transition:box-shadow .1s ease, background .1s ease}
   .flash.on{background:var(--ok);box-shadow:0 0 16px 4px rgba(52,211,153,.6)}
   footer{position:fixed;bottom:0;left:0;right:0;padding:10px 16px;background:linear-gradient(180deg,rgba(17,20,39,.0),rgba(17,20,39,.95));backdrop-filter:blur(6px)}
-  .unlock{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(15,18,32,.88);z-index:9999}
-  .unlock>div{background:#111427;border:1px solid #2a2f54;border-radius:14px;padding:18px 20px;text-align:center;max-width:320px;color:#e6e6f0}
+  .unlock-banner{position:fixed;left:0;right:0;bottom:0;z-index:9999;display:flex;justify-content:center;padding:14px}
+  .unlock-card{display:flex;gap:12px;align-items:center;background:#111427;border:1px solid #2a2f54;border-radius:16px;padding:10px 12px;box-shadow:0 10px 30px rgba(0,0,0,.35)}
 </style>
 </head>
 <body>
-  <div class="unlock" id="unlock">
-    <div>
-      <div style="font-weight:700;margin-bottom:8px">Toque para habilitar o áudio</div>
-      <button type="button" class="btn btn--primary" id="unlockBtn">Habilitar áudio</button>
-      <div style="font-size:12px;color:#9aa3c7;margin-top:8px">iOS exige interação para iniciar o som.</div>
+  <!-- Banner (não bloqueia a tela) -->
+  <div class="unlock-banner" id="unlock">
+    <div class="unlock-card">
+      <span style="font-size:13px;color:#c7cffb">Toque para habilitar o áudio</span>
+      <button type="button" class="btn btn--primary" id="unlockBtn" onclick="window.__unlockAudio && window.__unlockAudio()">Habilitar áudio</button>
     </div>
   </div>
 
@@ -151,242 +151,241 @@
   </footer>
 
 <script>
-(function(){
-  // ===== ÚNICO AudioContext (metrônomo + afinador) =====
-  let ctx=null, masterGain=null;
-  function primeSound(){
+// ===== ÚNICO AudioContext (metrônomo + afinador) =====
+let ctx=null, masterGain=null;
+function __primeSound(){
+  const o = ctx.createOscillator(), g = ctx.createGain();
+  o.type='square'; o.frequency.value = 800; g.gain.value=0.0001;
+  o.connect(g).connect(masterGain);
+  const t = ctx.currentTime;
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(0.2, t + 0.02);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + 0.06);
+  o.start(t); o.stop(t + 0.08);
+}
+function initAudio(){
+  if (ctx) return true;
+  ctx = new (window.AudioContext || window.webkitAudioContext)();
+  masterGain = ctx.createGain();
+  masterGain.gain.value = parseFloat(document.getElementById('volume')?.value || '0.9');
+  masterGain.connect(ctx.destination);
+  __primeSound();
+  return true;
+}
+// Expor função global para o onclick do botão
+window.__unlockAudio = function(){
+  if(!ctx) initAudio();
+  ctx.resume && ctx.resume();
+  const banner = document.getElementById('unlock');
+  if (banner) banner.style.display='none';
+};
+// Redundância: também tentar habilitar em eventos globais
+['pointerdown','touchstart','click','keydown'].forEach(ev=>{
+  window.addEventListener(ev, function once(){
+    if(!ctx) initAudio();
+    ctx && ctx.resume && ctx.resume();
+    const banner = document.getElementById('unlock');
+    if (banner) banner.style.display='none';
+    window.removeEventListener(ev, once, {passive:true});
+  }, {passive:true, once:true});
+});
+document.addEventListener('visibilitychange', ()=>{
+  if (document.visibilityState==='visible' && ctx && ctx.state!=='running'){ ctx.resume(); }
+});
+
+// ===== METRÔNOMO =====
+let isRunning=false, currentBeat=0, nextNoteTime=0, lookahead=25/1000, scheduleAheadTime=0.2, timerID=null, tapTimes=[];
+const bpmRange = document.getElementById('bpm');
+const bpmOut = document.getElementById('bpmOut');
+const beatsNum = document.getElementById('beats');
+const noteValue = document.getElementById('noteValue');
+const subdivSel = document.getElementById('subdiv');
+const volume = document.getElementById('volume');
+const swing = document.getElementById('swing');
+const soundSel = document.getElementById('sound');
+const vibrateSel = document.getElementById('vibrate');
+const startBtn = document.getElementById('startBtn');
+const stopBtn = document.getElementById('stopBtn');
+const flash = document.getElementById('flash');
+const sigOut = document.getElementById('sigOut');
+bpmOut.textContent=bpmRange.value;
+sigOut.textContent=`1/${noteValue.value}`;
+volume.addEventListener('input',()=>{ if(masterGain) masterGain.gain.value = parseFloat(volume.value||'0.9'); });
+
+const sounds = {
+  click: (time, freq=1000, dur=0.005, vol=1.0)=>{
     const o = ctx.createOscillator();
     const g = ctx.createGain();
-    o.type='square'; o.frequency.value = 800;
-    g.gain.value = 0.0001;
+    o.type = 'square'; o.frequency.setValueAtTime(freq, time);
+    g.gain.setValueAtTime(0, time);
+    g.gain.linearRampToValueAtTime(vol, time + 0.001);
+    g.gain.exponentialRampToValueAtTime(0.0001, time + dur);
     o.connect(g).connect(masterGain);
-    const t = ctx.currentTime;
-    g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(0.2, t + 0.02);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.06);
-    o.start(t); o.stop(t + 0.08);
+    o.start(time); o.stop(time + dur + 0.02);
+  },
+  wood: (time, isAccent=false)=>{
+    const o = ctx.createOscillator();
+    const n = ctx.createOscillator();
+    const g = ctx.createGain();
+    o.type='square'; n.type='triangle';
+    const base = isAccent? 1600: 900;
+    o.frequency.setValueAtTime(base, time);
+    n.frequency.setValueAtTime(base*0.5, time);
+    g.gain.setValueAtTime(isAccent?1.0:0.6, time);
+    g.gain.exponentialRampToValueAtTime(0.0001, time + 0.06);
+    o.connect(g); n.connect(g); g.connect(masterGain);
+    o.start(time); n.start(time); o.stop(time+0.08); n.stop(time+0.08);
+  },
+  hihat: (time, isAccent=false)=>{
+    const bufferSize = 2 * ctx.sampleRate;
+    const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) data[i] = (Math.random()*2-1) * (isAccent?1:0.6);
+    const noise = ctx.createBufferSource(); noise.buffer = buffer;
+    const bp = ctx.createBiquadFilter(); bp.type='highpass'; bp.frequency.value = 7000;
+    const g = ctx.createGain(); g.gain.setValueAtTime(0.9, time); g.gain.exponentialRampToValueAtTime(0.0001, time+0.04);
+    noise.connect(bp).connect(g).connect(masterGain);
+    noise.start(time); noise.stop(time+0.05);
   }
-  function initAudio(){
-    if (ctx) return true;
-    ctx = new (window.AudioContext || window.webkitAudioContext)();
-    masterGain = ctx.createGain();
-    masterGain.gain.value = parseFloat(document.getElementById('volume')?.value || '0.9');
-    masterGain.connect(ctx.destination);
-    primeSound(); // “desbloqueia” no gesto
-    return true;
+};
+
+function getParams(){
+  const bpm = parseInt(bpmRange.value);
+  const denom = parseInt(noteValue.value);
+  const beats = Math.max(1, Math.min(12, parseInt(beatsNum.value||4)));
+  const subdivision = parseInt(subdivSel.value);
+  const secondsPerBeat = 60 / bpm * (4/denom);
+  const pulsesPerBeat = subdivision;
+  const pulsesPerBar = beats * pulsesPerBeat;
+  const secondsPerPulse = secondsPerBeat / pulsesPerBeat;
+  let intervalSPP = secondsPerPulse;
+  if((pulsesPerBeat % 2 === 0) && swing.value > 0){
+    const swingPct = parseInt(swing.value)/100;
+    const isEven = (currentBeat % 2 === 1);
+    const long = secondsPerBeat * 0.5 * (1 + swingPct);
+    const short = secondsPerBeat * 0.5 * (1 - swingPct);
+    intervalSPP = (pulsesPerBeat===2) ? (isEven? short : long) : secondsPerPulse;
   }
-  // Overlay de desbloqueio
-  const unlock = document.getElementById('unlock');
-  const unlockBtn = document.getElementById('unlockBtn');
-  function unlockAudio(){
-    if (!ctx) initAudio();
-    ctx.resume && ctx.resume();
-    unlock.style.display='none';
+  const pulseIndex = currentBeat % pulsesPerBar;
+  return {bpm, beats, denom, pulsesPerBeat, pulsesPerBar, secondsPerPulse, intervalSPP, pulseIndex};
+}
+
+function playTick(time, isAccent, isSub){
+  const type = soundSel.value;
+  if(type==='click'){ sounds.click(time, isAccent? 1800 : (isSub? 1100: 1400), isSub? 0.03:0.04, isAccent? 1.0 : (isSub?0.45:0.75)); }
+  else if(type==='wood'){ sounds.wood(time, isAccent); }
+  else { sounds.hihat(time, isAccent); }
+  if(vibrateSel.value==='on' && navigator.vibrate){ if(isAccent) navigator.vibrate(20); else if(!isSub) navigator.vibrate(10); }
+}
+
+function nextNote(dt){ nextNoteTime += dt; currentBeat++; }
+
+let timerID=null;
+function scheduler(){
+  while(nextNoteTime < ctx.currentTime + scheduleAheadTime){
+    const P = getParams();
+    const beatIndex = P.pulseIndex % P.pulsesPerBar;
+    const isSub = (P.pulsesPerBeat>1) && (beatIndex % P.pulsesPerBeat !== 0);
+    const isAccent = !isSub && (beatIndex % P.pulsesPerBeat === 0) && (Math.floor(beatIndex / P.pulsesPerBeat) === 0);
+    const t = nextNoteTime;
+    setTimeout(()=>{ flash.classList.add('on'); setTimeout(()=>flash.classList.remove('on'), 60); }, Math.max(0, (t-ctx.currentTime)*1000));
+    playTick(t, isAccent, isSub);
+    nextNote(P.intervalSPP);
   }
-  ['pointerdown','touchstart','click'].forEach(ev=>{
-    unlock.addEventListener(ev, unlockAudio, {passive:true});
-    unlockBtn.addEventListener(ev, unlockAudio, {passive:true});
-  });
-  document.addEventListener('visibilitychange', ()=>{
-    if (document.visibilityState==='visible' && ctx && ctx.state!=='running'){ ctx.resume(); }
-  });
+  timerID = setTimeout(scheduler, lookahead*1000);
+}
 
-  // ===== METRÔNOMO =====
-  let isRunning=false, currentBeat=0, nextNoteTime=0, lookahead=25/1000, scheduleAheadTime=0.2, timerID=null, tapTimes=[];
-  const bpmRange = document.getElementById('bpm');
-  const bpmOut = document.getElementById('bpmOut');
-  const beatsNum = document.getElementById('beats');
-  const noteValue = document.getElementById('noteValue');
-  const subdivSel = document.getElementById('subdiv');
-  const volume = document.getElementById('volume');
-  const swing = document.getElementById('swing');
-  const soundSel = document.getElementById('sound');
-  const vibrateSel = document.getElementById('vibrate');
-  const startBtn = document.getElementById('startBtn');
-  const stopBtn = document.getElementById('stopBtn');
-  const flash = document.getElementById('flash');
-  const sigOut = document.getElementById('sigOut');
-  bpmOut.textContent=bpmRange.value;
-  sigOut.textContent=`1/${noteValue.value}`;
-  volume.addEventListener('input',()=>{ if(masterGain) masterGain.gain.value = parseFloat(volume.value||'0.9'); });
+function startMetronome(){
+  if(!ctx) initAudio();
+  ctx.resume && ctx.resume();
+  if (isRunning) return;
+  isRunning=true; startBtn.disabled=true; stopBtn.disabled=false;
+  currentBeat=0; nextNoteTime = ctx.currentTime + 0.05;
+  playTick(ctx.currentTime, true, false);
+  scheduler();
+}
+function stopMetronome(){
+  isRunning=false; startBtn.disabled=false; stopBtn.disabled=true;
+  clearTimeout(timerID);
+}
+['pointerdown','click'].forEach(ev=>{
+  startBtn.addEventListener(ev, startMetronome);
+  stopBtn.addEventListener(ev, stopMetronome);
+});
 
-  const sounds = {
-    click: (time, freq=1000, dur=0.005, vol=1.0)=>{
-      const o = ctx.createOscillator();
-      const g = ctx.createGain();
-      o.type = 'square'; o.frequency.setValueAtTime(freq, time);
-      g.gain.setValueAtTime(0, time);
-      g.gain.linearRampToValueAtTime(vol, time + 0.001);
-      g.gain.exponentialRampToValueAtTime(0.0001, time + dur);
-      o.connect(g).connect(masterGain);
-      o.start(time); o.stop(time + dur + 0.02);
-    },
-    wood: (time, isAccent=false)=>{
-      const o = ctx.createOscillator();
-      const n = ctx.createOscillator();
-      const g = ctx.createGain();
-      o.type='square'; n.type='triangle';
-      const base = isAccent? 1600: 900;
-      o.frequency.setValueAtTime(base, time);
-      n.frequency.setValueAtTime(base*0.5, time);
-      g.gain.setValueAtTime(isAccent?1.0:0.6, time);
-      g.gain.exponentialRampToValueAtTime(0.0001, time + 0.06);
-      o.connect(g); n.connect(g); g.connect(masterGain);
-      o.start(time); n.start(time); o.stop(time+0.08); n.stop(time+0.08);
-    },
-    hihat: (time, isAccent=false)=>{
-      const bufferSize = 2 * ctx.sampleRate;
-      const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
-      const data = buffer.getChannelData(0);
-      for (let i = 0; i < bufferSize; i++) data[i] = (Math.random()*2-1) * (isAccent?1:0.6);
-      const noise = ctx.createBufferSource(); noise.buffer = buffer;
-      const bp = ctx.createBiquadFilter(); bp.type='highpass'; bp.frequency.value = 7000;
-      const g = ctx.createGain(); g.gain.setValueAtTime(0.9, time); g.gain.exponentialRampToValueAtTime(0.0001, time+0.04);
-      noise.connect(bp).connect(g).connect(masterGain);
-      noise.start(time); noise.stop(time+0.05);
-    }
-  };
-
-  function getParams(){
-    const bpm = parseInt(bpmRange.value);
-    const denom = parseInt(noteValue.value);
-    const beats = Math.max(1, Math.min(12, parseInt(beatsNum.value||4)));
-    const subdivision = parseInt(subdivSel.value);
-    const secondsPerBeat = 60 / bpm * (4/denom);
-    const pulsesPerBeat = subdivision;
-    const pulsesPerBar = beats * pulsesPerBeat;
-    const secondsPerPulse = secondsPerBeat / pulsesPerBeat;
-    let intervalSPP = secondsPerPulse;
-    if((pulsesPerBeat % 2 === 0) && swing.value > 0){
-      const swingPct = parseInt(swing.value)/100;
-      const isEven = (currentBeat % 2 === 1);
-      const long = secondsPerBeat * 0.5 * (1 + swingPct);
-      const short = secondsPerBeat * 0.5 * (1 - swingPct);
-      intervalSPP = (pulsesPerBeat===2) ? (isEven? short : long) : secondsPerPulse;
-    }
-    const pulseIndex = currentBeat % pulsesPerBar;
-    return {bpm, beats, denom, pulsesPerBeat, pulsesPerBar, secondsPerPulse, intervalSPP, pulseIndex};
+// TAP tempo
+const tapBtn = document.getElementById('tapBtn');
+function tap(){
+  const t = performance.now(); tapTimes.push(t); if(tapTimes.length>6) tapTimes.shift();
+  if(tapTimes.length>=2){
+    let s=0; for(let i=1;i<tapTimes.length;i++) s += tapTimes[i]-tapTimes[i-1];
+    const avg = s/(tapTimes.length-1); const bpmEst = Math.min(300, Math.max(30, Math.round(60000/avg)));
+    bpmRange.value=bpmEst; bpmOut.textContent=bpmEst;
   }
+  flash.classList.add('on'); setTimeout(()=>flash.classList.remove('on'), 60);
+}
+['pointerdown','click'].forEach(ev=> tapBtn.addEventListener(ev, tap));
+bpmRange.addEventListener('input',()=> bpmOut.textContent=bpmRange.value);
 
-  function playTick(time, isAccent, isSub){
-    const type = soundSel.value;
-    if(type==='click'){ sounds.click(time, isAccent? 1800 : (isSub? 1100: 1400), isSub? 0.03:0.04, isAccent? 1.0 : (isSub?0.45:0.75)); }
-    else if(type==='wood'){ sounds.wood(time, isAccent); }
-    else { sounds.hihat(time, isAccent); }
-    if(vibrateSel.value==='on' && navigator.vibrate){ if(isAccent) navigator.vibrate(20); else if(!isSub) navigator.vibrate(10); }
-  }
+// ===== Afinador usando o MESMO ctx =====
+let tunerStream=null, tunerAnalyser=null, tunerBuf=null, tunerRAF=0;
+const tStart=document.getElementById('tunerStart'), tStop=document.getElementById('tunerStop');
+const fEl=document.getElementById('tunerFreq'), nEl=document.getElementById('tunerNote'), cEl=document.getElementById('tunerCents');
+const A4El=document.getElementById('calibA4'), smoothEl=document.getElementById('tunerSmooth');
 
-  function nextNote(dt){ nextNoteTime += dt; currentBeat++; }
+function noteFromFrequency(freq, A4){
+  const n = Math.round(12 * Math.log2(freq / A4)) + 69;
+  const names = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+  const name = names[(n % 12 + 12) % 12] + Math.floor(n/12 - 1);
+  const ref = A4 * Math.pow(2, (n - 69)/12);
+  const cents = 1200 * Math.log2(freq / ref);
+  return {name, cents, ref};
+}
+function autoCorrelate(buf, sampleRate){
+  let SIZE = buf.length, rms = 0;
+  for (let i=0;i<SIZE;i++){ const v = buf[i]/128 - 1; rms += v*v; }
+  rms = Math.sqrt(rms/SIZE); if (rms < 0.01) return -1;
+  let c = new Array(SIZE).fill(0);
+  for (let i=0;i<SIZE;i++){ let sum=0; for (let j=0;j<SIZE-i;j++){ const a=buf[j]/128-1, b=buf[j+i]/128-1; sum += a*b; } c[i]=sum; }
+  let d=0; while (c[d] > c[d+1]) d++;
+  let maxVal=-1, maxPos=-1; for(let i=d;i<SIZE;i++){ if(c[i]>maxVal){maxVal=c[i];maxPos=i;} }
+  let T0=maxPos, x1=c[T0-1]||0, x2=c[T0], x3=c[T0+1]||0; const a=(x1+x3-2*x2)/2, b=(x3-x1)/2; if(a) T0 = T0 - b/(2*a);
+  return sampleRate / T0;
+}
 
-  let timerID=null;
-  function scheduler(){
-    while(nextNoteTime < ctx.currentTime + scheduleAheadTime){
-      const P = getParams();
-      const beatIndex = P.pulseIndex % P.pulsesPerBar;
-      const isSub = (P.pulsesPerBeat>1) && (beatIndex % P.pulsesPerBeat !== 0);
-      const isAccent = !isSub && (beatIndex % P.pulsesPerBeat === 0) && (Math.floor(beatIndex / P.pulsesPerBeat) === 0);
-      const t = nextNoteTime;
-      setTimeout(()=>{ flash.classList.add('on'); setTimeout(()=>flash.classList.remove('on'), 60); }, Math.max(0, (t-ctx.currentTime)*1000));
-      playTick(t, isAccent, isSub);
-      nextNote(P.intervalSPP);
-    }
-    timerID = setTimeout(scheduler, lookahead*1000);
-  }
-
-  function startMetronome(){
-    if(!ctx) initAudio();
-    ctx.resume && ctx.resume();
-    if (isRunning) return;
-    isRunning=true; startBtn.disabled=true; stopBtn.disabled=false;
-    currentBeat=0; nextNoteTime = ctx.currentTime + 0.05;
-    // toca um tick imediato no gesto
-    playTick(ctx.currentTime, true, false);
-    scheduler();
-  }
-  function stopMetronome(){
-    isRunning=false; startBtn.disabled=false; stopBtn.disabled=true;
-    clearTimeout(timerID);
-  }
-  ['pointerdown','click'].forEach(ev=>{
-    startBtn.addEventListener(ev, startMetronome);
-    stopBtn.addEventListener(ev, stopMetronome);
-  });
-
-  // TAP tempo
-  const tapBtn = document.getElementById('tapBtn');
-  function tap(){
-    const t = performance.now(); tapTimes.push(t); if(tapTimes.length>6) tapTimes.shift();
-    if(tapTimes.length>=2){
-      let s=0; for(let i=1;i<tapTimes.length;i++) s += tapTimes[i]-tapTimes[i-1];
-      const avg = s/(tapTimes.length-1); const bpmEst = Math.min(300, Math.max(30, Math.round(60000/avg)));
-      bpmRange.value=bpmEst; bpmOut.textContent=bpmEst;
-    }
-    flash.classList.add('on'); setTimeout(()=>flash.classList.remove('on'), 60);
-  }
-  ['pointerdown','click'].forEach(ev=> tapBtn.addEventListener(ev, tap));
-  bpmRange.addEventListener('input',()=> bpmOut.textContent=bpmRange.value);
-
-  // ===== Afinador usando o MESMO ctx =====
-  let tunerStream=null, tunerAnalyser=null, tunerBuf=null, tunerRAF=0;
-  const tStart=document.getElementById('tunerStart'), tStop=document.getElementById('tunerStop');
-  const fEl=document.getElementById('tunerFreq'), nEl=document.getElementById('tunerNote'), cEl=document.getElementById('tunerCents');
-  const A4El=document.getElementById('calibA4'), smoothEl=document.getElementById('tunerSmooth');
-
-  function noteFromFrequency(freq, A4){
-    const n = Math.round(12 * Math.log2(freq / A4)) + 69;
-    const names = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
-    const name = names[(n % 12 + 12) % 12] + Math.floor(n/12 - 1);
-    const ref = A4 * Math.pow(2, (n - 69)/12);
-    const cents = 1200 * Math.log2(freq / ref);
-    return {name, cents, ref};
-  }
-  function autoCorrelate(buf, sampleRate){
-    let SIZE = buf.length, rms = 0;
-    for (let i=0;i<SIZE;i++){ const v = buf[i]/128 - 1; rms += v*v; }
-    rms = Math.sqrt(rms/SIZE); if (rms < 0.01) return -1;
-    let c = new Array(SIZE).fill(0);
-    for (let i=0;i<SIZE;i++){ let sum=0; for (let j=0;j<SIZE-i;j++){ const a=buf[j]/128-1, b=buf[j+i]/128-1; sum += a*b; } c[i]=sum; }
-    let d=0; while (c[d] > c[d+1]) d++;
-    let maxVal=-1, maxPos=-1; for(let i=d;i<SIZE;i++){ if(c[i]>maxVal){maxVal=c[i];maxPos=i;} }
-    let T0=maxPos, x1=c[T0-1]||0, x2=c[T0], x3=c[T0+1]||0; const a=(x1+x3-2*x2)/2, b=(x3-x1)/2; if(a) T0 = T0 - b/(2*a);
-    return sampleRate / T0;
-  }
-
-  async function startTuner(){
-    try{
-      if(!ctx) initAudio();
-      ctx.resume && ctx.resume();
-      tunerStream = await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false, noiseSuppression:false, autoGainControl:false}});
-      const source = ctx.createMediaStreamSource(tunerStream); // MESMO ctx
-      tunerAnalyser = ctx.createAnalyser();
-      tunerAnalyser.fftSize = 2048;
-      source.connect(tunerAnalyser);
-      tunerBuf = new Uint8Array(tunerAnalyser.fftSize);
-    }catch(e){ alert('Sem acesso ao microfone (HTTPS/permissões).'); return; }
-    tStart.disabled=true; tStop.disabled=false;
-    function loop(){
-      tunerAnalyser.getByteTimeDomainData(tunerBuf);
-      let hz = autoCorrelate(tunerBuf, ctx.sampleRate);
-      const a = parseFloat(smoothEl.value), last = window.__lastHz || hz;
-      if (hz>0) hz = a*hz + (1-a)*last;
-      window.__lastHz = hz;
-      if (hz>0 && hz<2000){
-        const A4=parseFloat(A4El.value)||440, nf=noteFromFrequency(hz, A4);
-        fEl.textContent = hz.toFixed(2); nEl.textContent = nf.name; cEl.textContent = nf.cents.toFixed(1);
-      } else { fEl.textContent='--'; nEl.textContent='--'; cEl.textContent='--'; }
-      tunerRAF = requestAnimationFrame(loop);
-    }
+async function startTuner(){
+  try{
+    if(!ctx) initAudio(); ctx.resume && ctx.resume();
+    tunerStream = await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false, noiseSuppression:false, autoGainControl:false}});
+    const source = ctx.createMediaStreamSource(tunerStream);
+    tunerAnalyser = ctx.createAnalyser(); tunerAnalyser.fftSize = 2048;
+    source.connect(tunerAnalyser);
+    tunerBuf = new Uint8Array(tunerAnalyser.fftSize);
+  }catch(e){ alert('Sem acesso ao microfone (HTTPS/permissões).'); return; }
+  tStart.disabled=true; tStop.disabled=false;
+  function loop(){
+    tunerAnalyser.getByteTimeDomainData(tunerBuf);
+    let hz = autoCorrelate(tunerBuf, ctx.sampleRate);
+    const a = parseFloat(smoothEl.value), last = window.__lastHz || hz;
+    if (hz>0) hz = a*hz + (1-a)*last;
+    window.__lastHz = hz;
+    if (hz>0 && hz<2000){
+      const A4=parseFloat(A4El.value)||440, nf=noteFromFrequency(hz, A4);
+      fEl.textContent = hz.toFixed(2); nEl.textContent = nf.name; cEl.textContent = nf.cents.toFixed(1);
+    } else { fEl.textContent='--'; nEl.textContent='--'; cEl.textContent='--'; }
     tunerRAF = requestAnimationFrame(loop);
   }
-  function stopTuner(){
-    tStart.disabled=false; tStop.disabled=true;
-    cancelAnimationFrame(tunerRAF);
-    if (tunerStream){ tunerStream.getTracks().forEach(t=>t.stop()); tunerStream=null; }
-  }
-  ['pointerdown','click'].forEach(ev=>{
-    tStart.addEventListener(ev, startTuner);
-    tStop.addEventListener(ev, stopTuner);
-  });
-})();</script>
+  tunerRAF = requestAnimationFrame(loop);
+}
+function stopTuner(){
+  tStart.disabled=false; tStop.disabled=true;
+  cancelAnimationFrame(tunerRAF);
+  if (tunerStream){ tunerStream.getTracks().forEach(t=>t.stop()); tunerStream=null; }
+}
+['pointerdown','click'].forEach(ev=>{
+  tStart.addEventListener(ev, startTuner);
+  tStop.addEventListener(ev, stopTuner);
+});
+</script>
 </body>
 </html>
