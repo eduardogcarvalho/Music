@@ -1,4 +1,4 @@
-const CACHE_NAME = 'srm-v1';
+const CACHE_NAME = 'srm-v2';
 const ASSETS = [
   './',
   './index.html',
