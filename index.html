@@ -27,25 +27,11 @@
   .btn--danger{border-color:#ef4444;background:linear-gradient(180deg,#ef4444,#991b1b)}
   .pill{display:inline-block;background:#0f1330;border:1px solid #2a2f54;border-radius:30px;padding:6px 10px;font-size:13px;color:#c7cffb;min-width:70px;text-align:center}
   .bpm-display{font-size:44px;font-weight:800;letter-spacing:.5px}
-  .pendulum{position:relative;height:170px;border-radius:12px;background:linear-gradient(180deg,#101534,#0c1027);border:1px solid #262c50;overflow:hidden}
-  .bar{position:absolute;top:0;bottom:0;width:4px;left:50%;transform:translateX(-50%);background:#2a305e}
-  .bob{position:absolute;bottom:16px;left:50%;width:22px;height:22px;border-radius:50%;transform:translate(-50%,0);background:var(--accent);box-shadow:0 0 20px rgba(110,231,255,.35)}
   .flash{width:12px;height:12px;border-radius:50%;background:#334155;box-shadow:0 0 0 0 rgba(52,211,153,0);transition:box-shadow .1s ease, background .1s ease}
   .flash.on{background:var(--ok);box-shadow:0 0 16px 4px rgba(52,211,153,.6)}
-  footer{position:fixed;bottom:0;left:0;right:0;padding:10px 16px;background:linear-gradient(180deg,rgba(17,20,39,.0),rgba(17,20,39,.95));backdrop-filter:blur(6px)}
-  .unlock-banner{position:fixed;left:0;right:0;bottom:0;z-index:9999;display:flex;justify-content:center;padding:14px}
-  .unlock-card{display:flex;gap:12px;align-items:center;background:#111427;border:1px solid #2a2f54;border-radius:16px;padding:10px 12px;box-shadow:0 10px 30px rgba(0,0,0,.35)}
 </style>
 </head>
 <body>
-  <!-- Banner (não bloqueia a tela) -->
-  <div class="unlock-banner" id="unlock">
-    <div class="unlock-card">
-      <span style="font-size:13px;color:#c7cffb">Toque para habilitar o áudio</span>
-      <button type="button" class="btn btn--primary" id="unlockBtn" onclick="window.__unlockAudio && window.__unlockAudio()">Habilitar áudio</button>
-    </div>
-  </div>
-
   <header>
     <h1>Sergio Roberto Music</h1>
   </header>
@@ -146,14 +132,10 @@
     </div>
   </main>
 
-  <footer>
-    <div class="credits">Sergio Roberto Music • Metrônomo + Afinador (iOS unlock com único AudioContext)</div>
-  </footer>
-
 <script>
-// ===== ÚNICO AudioContext (metrônomo + afinador) =====
+// ===== ÚNICO AudioContext (metrônomo + afinador), sem overlay =====
 let ctx=null, masterGain=null;
-function __primeSound(){
+function primeSound(){
   const o = ctx.createOscillator(), g = ctx.createGain();
   o.type='square'; o.frequency.value = 800; g.gain.value=0.0001;
   o.connect(g).connect(masterGain);
@@ -169,26 +151,25 @@ function initAudio(){
   masterGain = ctx.createGain();
   masterGain.gain.value = parseFloat(document.getElementById('volume')?.value || '0.9');
   masterGain.connect(ctx.destination);
-  __primeSound();
+  primeSound();
   return true;
 }
-// Expor função global para o onclick do botão
-window.__unlockAudio = function(){
-  if(!ctx) initAudio();
-  ctx.resume && ctx.resume();
-  const banner = document.getElementById('unlock');
-  if (banner) banner.style.display='none';
-};
-// Redundância: também tentar habilitar em eventos globais
-['pointerdown','touchstart','click','keydown'].forEach(ev=>{
-  window.addEventListener(ev, function once(){
+// Gatilho global: primeiro toque em qualquer lugar
+(function(){
+  let armed = true;
+  function once(){
+    if (!armed) return;
+    armed = false;
     if(!ctx) initAudio();
     ctx && ctx.resume && ctx.resume();
-    const banner = document.getElementById('unlock');
-    if (banner) banner.style.display='none';
-    window.removeEventListener(ev, once, {passive:true});
-  }, {passive:true, once:true});
-});
+    window.removeEventListener('pointerdown', once, true);
+    window.removeEventListener('touchstart', once, true);
+    window.removeEventListener('click', once, true);
+  }
+  window.addEventListener('pointerdown', once, true);
+  window.addEventListener('touchstart', once, true);
+  window.addEventListener('click', once, true);
+})();
 document.addEventListener('visibilitychange', ()=>{
   if (document.visibilityState==='visible' && ctx && ctx.state!=='running'){ ctx.resume(); }
 });
@@ -386,6 +367,13 @@ function stopTuner(){
   tStart.addEventListener(ev, startTuner);
   tStop.addEventListener(ev, stopTuner);
 });
+
+// SW (se existir)
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function() {
+    navigator.serviceWorker.register('sw.js').catch(()=>{});
+  });
+}
 </script>
 </body>
 </html>
