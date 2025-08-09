@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Sergio Roberto Music</title>
+<style>
+  :root{
+    --bg:#0f1220; --panel:#171a2b; --accent:#6ee7ff; --accent2:#a78bfa; --ok:#34d399; --warn:#f59e0b; --text:#e6e6f0;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Arial,sans-serif;background:radial-gradient(1000px 600px at 20% -10%, #1b2040, transparent),var(--bg);color:var(--text);}
+  header{padding:16px 20px;border-bottom:1px solid #282b45;background:linear-gradient(180deg,#171a2b 0%, #111427 100%);position:sticky;top:0;z-index:10}
+  header h1{margin:0;font-size:18px;letter-spacing:.3px;display:flex;align-items:center;gap:10px}
+  header .dot{width:10px;height:10px;border-radius:50%;background:#999;box-shadow:0 0 0 0 rgba(110,231,255,0.7);transition:background .15s ease, box-shadow .15s ease}
+  header .dot.active{background:var(--accent);box-shadow:0 0 10px 3px rgba(110,231,255,.6)}
+  main{max-width:1100px;margin:0 auto;padding:22px 18px 90px}
+  .grid{display:grid;grid-template-columns:repeat(12,1fr);gap:14px}
+  .card{grid-column:span 12;background:rgba(255,255,255,.03);border:1px solid #283052;border-radius:14px;padding:16px; position:relative; z-index:1;}
+  @media(min-width:900px){ .card--left{grid-column:span 7} .card--right{grid-column:span 5} }
+  h2{margin:0 0 12px 0;font-size:15px;color:#b8c0ff;font-weight:600}
+  .row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+  .control{flex:1;min-width:140px}
+  label{display:block;font-size:12px;color:#a6aacf;margin:0 0 6px 2px}
+  input[type="range"]{width:100%}
+  input[type="number"], select{width:100%;background:#0f1330;border:1px solid #2a2f54;color:var(--text);border-radius:10px;padding:10px 12px;font-size:15px}
+  .btn{cursor:pointer;border:1px solid #2a2f54;background:linear-gradient(180deg,#232848,#1a1f3d);color:#fff;border-radius:12px;padding:10px 14px;font-weight:600;display:inline-flex;align-items:center;gap:10px;user-select:none;-webkit-tap-highlight-color: transparent; touch-action: manipulation;}
+  .btn:active{transform:translateY(1px)}
+  .btn--primary{border-color:#35b6e6;background:linear-gradient(180deg,#30a2d1,#1c6686)}
+  .btn--danger{border-color:#ef4444;background:linear-gradient(180deg,#ef4444,#991b1b)}
+  .pill{display:inline-block;background:#0f1330;border:1px solid #2a2f54;border-radius:30px;padding:6px 10px;font-size:13px;color:#c7cffb;min-width:70px;text-align:center}
+  .hud{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+  .bpm-display{font-size:44px;font-weight:800;letter-spacing:.5px}
+  .pendulum{position:relative;height:170px;border-radius:12px;background:linear-gradient(180deg,#101534,#0c1027);border:1px solid #262c50;overflow:hidden}
+  .bar{position:absolute;top:0;bottom:0;width:4px;left:50%;transform:translateX(-50%);background:#2a305e}
+  .bob{position:absolute;bottom:16px;left:50%;width:22px;height:22px;border-radius:50%;transform:translate(-50%,0);background:var(--accent);box-shadow:0 0 20px rgba(110,231,255,.35)}
+  .ticks{position:absolute;inset:0;display:flex;align-items:flex-end;justify-content:space-between;padding:10px 20px;opacity:.7}
+  .tick{width:2px;height:18px;background:#2a305e}
+  .flash{width:12px;height:12px;border-radius:50%;background:#334155;box-shadow:0 0 0 0 rgba(52,211,153,0);transition:box-shadow .1s ease, background .1s ease}
+  .flash.on{background:var(--ok);box-shadow:0 0 16px 4px rgba(52,211,153,.6)}
+  footer{position:fixed;bottom:0;left:0;right:0;padding:10px 16px;background:linear-gradient(180deg,rgba(17,20,39,.0),rgba(17,20,39,.95));backdrop-filter:blur(6px)}
+  .credits{font-size:12px;color:#9aa3c7}
+
+  /* Tuner */
+  .tuner-needle-wrap{position:relative;height:120px;margin-top:12px;border:1px solid #283052;border-radius:12px;background:linear-gradient(180deg,#101534,#0b0f25);}
+  .tuner-needle{position:absolute;left:50%;bottom:12px;width:4px;height:78px;background:var(--accent2);border-radius:2px;transform:translateX(-50%) rotate(0deg);transform-origin:50% 100%;transition:transform .08s ease;}
+  .tuner-scale{position:absolute;left:0;right:0;top:10px;display:flex;justify-content:space-between;padding:0 14px;color:#a6aacf;font-size:12px}
+</style>
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#0f1220">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+</head>
+<body>
+  <header>
+    <h1><span class="dot" id="liveDot"></span>Sergio Roberto Music</h1>
+  </header>
+  <main>
+    <div class="grid">
+      <section class="card card--left" aria-labelledby="lbl-tempo">
+        <h2 id="lbl-tempo">Metrônomo – Tempo & Compassos</h2>
+        <div class="hud">
+          <div class="bpm-display"><span id="bpmOut">120</span> BPM</div>
+          <span class="pill"><span id="barOut">1</span>/<span id="beatsOut">4</span></span>
+          <span class="pill">Agendamento preciso</span>
+          <div class="flash" id="flash"></div>
+        </div>
+
+        <div class="row" style="margin-top:12px">
+          <div class="control">
+            <label>BPM</label>
+            <input id="bpm" type="range" min="30" max="300" step="1" value="120" />
+          </div>
+          <div class="control">
+            <label>Tap Tempo</label>
+            <button type="button" class="btn tap-area" id="tapBtn" title="Toque com o ritmo">TAP</button>
+          </div>
+          <div class="control">
+            <label>Compasso (numerador)</label>
+            <input id="beats" type="number" min="1" max="12" value="4" />
+          </div>
+          <div class="control">
+            <label>Compasso (denominador)</label>
+            <select id="noteValue">
+              <option value="2">2</option>
+              <option value="4" selected>4</option>
+              <option value="8">8</option>
+              <option value="16">16</option>
+            </select>
+          </div>
+          <div class="control">
+            <label>Subdivisão</label>
+            <select id="subdiv">
+              <option value="1" selected>Sem</option>
+              <option value="2">Colcheias (2)</option>
+              <option value="3">Tercinas (3)</option>
+              <option value="4">Semicolcheias (4)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="row" style="margin-top:10px">
+          <div class="control">
+            <label>Volume</label>
+            <input id="volume" type="range" min="0" max="1" step="0.01" value="0.9" />
+          </div>
+          <div class="control">
+            <label>Swing (%)</label>
+            <input id="swing" type="range" min="0" max="75" step="1" value="0" />
+          </div>
+          <div class="control">
+            <label>Som</label>
+            <select id="sound">
+              <option value="click">Click</option>
+              <option value="wood">Wood</option>
+              <option value="hihat">Hi-Hat</option>
+            </select>
+          </div>
+          <div class="control">
+            <label>Vibração</label>
+            <select id="vibrate">
+              <option value="on" selected>Ativar</option>
+              <option value="off">Desativar</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="row" style="margin-top:14px">
+          <button type="button" class="btn btn--primary" id="startBtn">Iniciar</button>
+          <button type="button" class="btn btn--danger" id="stopBtn" disabled>Parar</button>
+          <span class="hint">Dica: no iOS/Android, aumente o volume do toque/mídia e mantenha a aba ativa para estabilidade.</span>
+        </div>
+
+        <div class="pendulum" style="margin-top:16px" aria-hidden="true">
+          <div class="bar"></div>
+          <div class="bob" id="bob"></div>
+          <div class="ticks">
+            <div class="tick"></div><div class="tick"></div><div class="tick"></div><div class="tick"></div><div class="tick"></div>
+          </div>
+        </div>
+      </section>
+
+      <aside class="card card--right" aria-labelledby="lbl-accents">
+        <h2 id="lbl-accents">Acentos por compasso</h2>
+        <div class="row">
+          <div class="control" style="min-width:100%">
+            <label>Marque os tempos que deseja acentuar</label>
+            <div id="accents" class="row"></div>
+          </div>
+        </div>
+        <div class="hint">O 1º tempo é acentuado por padrão.</div>
+      </aside>
+
+      <aside class="card card--right" aria-labelledby="lbl-tuner">
+        <h2 id="lbl-tuner">Afinador Cromático</h2>
+        <div class="row">
+          <button type="button" class="btn btn--primary" id="tunerStart">Iniciar Afinador</button>
+          <button type="button" class="btn btn--danger" id="tunerStop" disabled>Parar</button>
+        </div>
+        <div class="row" style="margin-top:12px">
+          <div class="control">
+            <label>Calibração (A4 Hz)</label>
+            <input id="calibA4" type="number" min="400" max="480" step="0.1" value="440">
+          </div>
+          <div class="control">
+            <label>Filtro (suavização)</label>
+            <input id="tunerSmooth" type="range" min="0" max="0.9" step="0.05" value="0.2">
+          </div>
+        </div>
+        <div class="hud" style="margin-top:10px">
+          <div class="pill">Freq: <span id="tunerFreq">--</span> Hz</div>
+          <div class="pill">Nota: <span id="tunerNote">--</span></div>
+          <div class="pill">Desvio: <span id="tunerCents">--</span> cents</div>
+        </div>
+        <div class="tuner-needle-wrap" aria-hidden="true">
+          <div class="tuner-scale">
+            <span>-50</span><span>-25</span><span>0</span><span>+25</span><span>+50</span>
+          </div>
+          <div class="tuner-needle" id="tunerNeedle"></div>
+        </div>
+        <div class="hint">Necessita microfone (HTTPS/localhost). Toque a corda e mantenha o ambiente silencioso.</div>
+      </aside>
+    </div>
+  </main>
+
+  <footer>
+    <div class="credits">Sergio Roberto Music • Metrônomo + Afinador (WebAudio). Para o afinador, abra via HTTPS/localhost por causa das permissões do navegador.</div>
+  </footer>
+
+<script>
+(function(){
+  // ---------- ÁUDIO (Metrônomo) ----------
+  const ctx = new (window.AudioContext || window.webkitAudioContext)();
+  let _audioUnlocked = false;
+  function unlockAudio(){ if(_audioUnlocked) return; ctx.resume && ctx.resume(); _audioUnlocked = true; document.removeEventListener('touchstart', unlockAudio); document.removeEventListener('pointerdown', unlockAudio); document.removeEventListener('click', unlockAudio); }
+  document.addEventListener('touchstart', unlockAudio, {passive:true});
+  document.addEventListener('pointerdown', unlockAudio);
+  document.addEventListener('click', unlockAudio);
+  let masterGain = ctx.createGain(); masterGain.gain.value = 0.9; masterGain.connect(ctx.destination);
+
+  const sounds = {
+    click: (time, freq=1000, dur=0.005, vol=1.0)=>{
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
+      o.type = 'square'; o.frequency.setValueAtTime(freq, time);
+      g.gain.setValueAtTime(0, time);
+      g.gain.linearRampToValueAtTime(vol, time + 0.001);
+      g.gain.exponentialRampToValueAtTime(0.0001, time + dur);
+      o.connect(g).connect(masterGain);
+      o.start(time); o.stop(time + dur + 0.02);
+    },
+    wood: (time, isAccent=false)=>{
+      const o = ctx.createOscillator();
+      const n = ctx.createOscillator();
+      const g = ctx.createGain();
+      o.type='square'; n.type='triangle';
+      const base = isAccent? 1600: 900;
+      o.frequency.setValueAtTime(base, time);
+      n.frequency.setValueAtTime(base*0.5, time);
+      g.gain.setValueAtTime(isAccent?1.0:0.6, time);
+      g.gain.exponentialRampToValueAtTime(0.0001, time + 0.06);
+      o.connect(g); n.connect(g); g.connect(masterGain);
+      o.start(time); n.start(time); o.stop(time+0.08); n.stop(time+0.08);
+    },
+    hihat: (time, isAccent=false)=>{
+      const bufferSize = 2 * ctx.sampleRate;
+      const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < bufferSize; i++) data[i] = (Math.random()*2-1) * (isAccent?1:0.6);
+      const noise = ctx.createBufferSource(); noise.buffer = buffer;
+      const bp = ctx.createBiquadFilter(); bp.type='highpass'; bp.frequency.value = 7000;
+      const g = ctx.createGain(); g.gain.setValueAtTime(0.9, time); g.gain.exponentialRampToValueAtTime(0.0001, time+0.04);
+      noise.connect(bp).connect(g).connect(masterGain);
+      noise.start(time); noise.stop(time+0.05);
+    }
+  };
+
+  function playTick(time, isAccent, isSub){
+    const type = soundSel.value;
+    if(type==='click'){
+      sounds.click(time, isAccent? 1800 : (isSub? 1100: 1400), isSub? 0.03:0.04, isAccent? 1.0 : (isSub?0.45:0.75));
+    } else if(type==='wood'){
+      sounds.wood(time, isAccent);
+    } else {
+      sounds.hihat(time, isAccent);
+    }
+    if(vibrateSel.value==='on' && navigator.vibrate){
+      if(isAccent) navigator.vibrate(20); else if(!isSub) navigator.vibrate(10);
+    }
+  }
+
+  // ---------- AGENDADOR (metronomo) ----------
+  let isRunning=false, currentBeat=0, nextNoteTime=0, lookahead=25/1000, scheduleAheadTime=0.2;
+  let tapTimes=[];
+
+  function nextNote(intervalSPP){
+    nextNoteTime += intervalSPP;
+    currentBeat++;
+  }
+
+  function scheduler(){
+    while(nextNoteTime < ctx.currentTime + scheduleAheadTime){
+      const comps = getComputedParams();
+      const beatIndex = comps.pulseIndex % comps.pulsesPerBar;
+      const isAccent = comps.accents[beatIndex] === 1;
+      const isSub = comps.isSubdivision;
+      const tickTime = nextNoteTime;
+      scheduleVisual(tickTime, beatIndex, comps);
+      playTick(tickTime, isAccent, isSub);
+      nextNote(comps.intervalSPPAdjusted);
+    }
+    timerID = setTimeout(scheduler, lookahead*1000);
+  }
+
+  let timerID = null;
+
+  function start(){
+    if(isRunning) return;
+    ctx.resume?.();
+    isRunning=true;
+    startBtn.disabled=true; stopBtn.disabled=false;
+    liveDot.classList.add('active');
+    currentBeat = 0;
+    nextNoteTime = ctx.currentTime + 0.05;
+    scheduler();
+  }
+
+  function stop(){
+    isRunning=false;
+    startBtn.disabled=false; stopBtn.disabled=true;
+    liveDot.classList.remove('active');
+    flash.classList.remove('on');
+    clearTimeout(timerID);
+  }
+
+  // ---------- PARÂMETROS ----------
+  const bpmRange = document.getElementById('bpm');
+  const bpmOut = document.getElementById('bpmOut');
+  const beatsNum = document.getElementById('beats');
+  const noteValue = document.getElementById('noteValue');
+  const subdivSel = document.getElementById('subdiv');
+  const volume = document.getElementById('volume');
+  const swing = document.getElementById('swing');
+  const soundSel = document.getElementById('sound');
+  const vibrateSel = document.getElementById('vibrate');
+  const startBtn = document.getElementById('startBtn');
+  const stopBtn = document.getElementById('stopBtn');
+  const barOut = document.getElementById('barOut');
+  const beatsOut = document.getElementById('beatsOut');
+  const liveDot = document.getElementById('liveDot');
+  const flash = document.getElementById('flash');
+  const bob = document.getElementById('bob');
+  const accentsWrap = document.getElementById('accents');
+  const tapBtn = document.getElementById('tapBtn');
+
+  function rebuildAccents(){
+    accentsWrap.innerHTML='';
+    const n = Math.max(1, Math.min(12, parseInt(beatsNum.value||4)));
+    for(let i=0;i<n;i++){
+      const chk = document.createElement('input');
+      chk.type='checkbox'; chk.checked = (i===0); chk.id='acc_'+i;
+      chk.style.transform='scale(1.2)'; chk.style.marginRight='4px';
+      const lbl = document.createElement('label'); lbl.htmlFor=chk.id; lbl.textContent = (i+1)+'º tempo';
+      lbl.style.display='inline-block'; lbl.style.marginRight='14px'; lbl.style.userSelect='none';
+      accentsWrap.appendChild(chk); accentsWrap.appendChild(lbl);
+    }
+  }
+  rebuildAccents();
+
+  function getAccents(){
+    const n = Math.max(1, Math.min(12, parseInt(beatsNum.value||4)));
+    const arr = new Array(n).fill(0);
+    for(let i=0;i<n;i++){
+      const el = document.getElementById('acc_'+i);
+      arr[i] = el && el.checked ? 1 : 0;
+    }
+    if(arr.every(x=>x===0)) arr[0]=1;
+    return arr;
+  }
+
+  function getComputedParams(){
+    const bpm = parseInt(bpmRange.value);
+    const denom = parseInt(noteValue.value);
+    const beats = Math.max(1, Math.min(12, parseInt(beatsNum.value||4)));
+    const subdivision = parseInt(subdivSel.value);
+    const accents = getAccents();
+
+    const secondsPerBeat = 60 / bpm * (4/denom);
+    const pulsesPerBeat = subdivision;
+    const pulsesPerBar = beats * pulsesPerBeat;
+    const secondsPerPulse = secondsPerBeat / pulsesPerBeat;
+
+    let intervalSPPAdjusted = secondsPerPulse;
+    let isSubdivision = pulsesPerBeat>1;
+    if(isSubdivision && (pulsesPerBeat % 2 === 0) && swing.value > 0){
+      const swingPct = parseInt(swing.value)/100;
+      const isEven = (currentBeat % 2 === 1);
+      const long = secondsPerBeat * 0.5 * (1 + swingPct);
+      const short = secondsPerBeat * 0.5 * (1 - swingPct);
+      intervalSPPAdjusted = (pulsesPerBeat===2) ? (isEven? short : long)/1 : secondsPerPulse;
+    }
+
+    const pulseIndex = currentBeat % pulsesPerBar;
+
+    return {bpm, beats, denom, secondsPerBeat, pulsesPerBeat, pulsesPerBar, secondsPerPulse, intervalSPPAdjusted, accents, pulseIndex, isSubdivision};
+  }
+
+  // ---------- UI Bindings ----------
+  bpmRange.addEventListener('input',()=>{ bpmOut.textContent=bpmRange.value; });
+  volume.addEventListener('input',()=> masterGain.gain.value = parseFloat(volume.value));
+  beatsNum.addEventListener('change',()=>{ rebuildAccents(); beatsOut.textContent = beatsNum.value; });
+  noteValue.addEventListener('change',()=>{ beatsOut.textContent = noteValue.value; });
+  startBtn.addEventListener('click', start);
+  startBtn.addEventListener('pointerdown', start);
+  stopBtn.addEventListener('click', stop);
+  stopBtn.addEventListener('pointerdown', stop);
+
+  tapBtn.addEventListener('click', ()=>registerTap());
+  tapBtn.addEventListener('pointerdown', ()=>registerTap());
+  tapBtn.addEventListener('touchstart', (e)=>{ e.preventDefault(); registerTap(); }, {passive:false});
+  function registerTap(){
+    const t = performance.now();
+    tapTimes.push(t);
+    if(tapTimes.length>6) tapTimes.shift();
+    if(tapTimes.length>=2){
+      let intervals = [];
+      for(let i=1;i<tapTimes.length;i++) intervals.push(tapTimes[i]-tapTimes[i-1]);
+      const avg = intervals.reduce((a,b)=>a+b,0)/intervals.length;
+      const bpmEst = Math.min(300, Math.max(30, Math.round(60000/avg)));
+      bpmRange.value = bpmEst; bpmOut.textContent = bpmEst;
+    }
+    flash.classList.add('on'); setTimeout(()=>flash.classList.remove('on'), 90);
+  }
+
+  function scheduleVisual(time, beatIndex, comps){
+    const when = (time - ctx.currentTime) * 1000;
+    setTimeout(()=>{
+      flash.classList.add('on'); setTimeout(()=>flash.classList.remove('on'), 70);
+      const pos = (beatIndex / (comps.pulsesPerBar-1||1))*80 - 40;
+      bob.style.left = (50 + pos) + '%';
+      if(beatIndex % comps.pulsesPerBeat === 0){
+        const barIdx = Math.floor(beatIndex / comps.pulsesPerBeat) + 1;
+        barOut.textContent = barIdx;
+      }
+    }, Math.max(0, when));
+  }
+
+  bpmOut.textContent = bpmRange.value;
+  beatsOut.textContent = noteValue.value;
+
+  // ---------- AFINADOR (Chromatic Tuner) ----------
+  let tunerStream = null, tunerSource = null, tunerAnalyser = null, tunerBuf = null, tunerRAF = 0;
+  const tunerStartBtn = document.getElementById('tunerStart');
+  const tunerStopBtn = document.getElementById('tunerStop');
+  const tunerFreqEl = document.getElementById('tunerFreq');
+  const tunerNoteEl = document.getElementById('tunerNote');
+  const tunerCentsEl = document.getElementById('tunerCents');
+  const tunerNeedle = document.getElementById('tunerNeedle');
+  const calibA4El = document.getElementById('calibA4');
+  const tunerSmoothEl = document.getElementById('tunerSmooth');
+
+  function noteFromFrequency(freq, A4){
+    const n = Math.round(12 * Math.log2(freq / A4)) + 69; // MIDI
+    const names = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+    const name = names[(n % 12 + 12) % 12] + Math.floor(n/12 - 1);
+    const ref = A4 * Math.pow(2, (n - 69)/12);
+    const cents = 1200 * Math.log2(freq / ref);
+    return {name, cents, ref};
+  }
+
+  function autoCorrelate(buf, sampleRate){
+    let SIZE = buf.length;
+    let rms = 0;
+    for (let i=0;i<SIZE;i++){ const val = buf[i]/128 - 1; rms += val*val; }
+    rms = Math.sqrt(rms/SIZE);
+    if (rms < 0.01) return -1;
+
+    let r1=0, r2=SIZE-1, thres=0.2;
+    for (let i=0;i<SIZE/2;i++){ if (Math.abs(buf[i]-128) < thres) { r1=i; break; } }
+    for (let i=1;i<SIZE/2;i++){ if (Math.abs(buf[SIZE-i]-128) < thres){ r2=SIZE-i; break; } }
+    buf = buf.slice(r1, r2); SIZE = buf.length;
+    const c = new Array(SIZE).fill(0);
+    for (let i=0;i<SIZE;i++){
+      c[i] = 0;
+      for (let j=0;j<SIZE-i;j++){
+        const a = buf[j]/128 - 1, b = buf[j+i]/128 - 1;
+        c[i] += a*b;
+      }
+    }
+    let d=0; while (c[d] > c[d+1]) d++;
+    let maxval=-1, maxpos=-1;
+    for (let i=d;i<SIZE;i++){
+      if (c[i] > maxval){ maxval = c[i]; maxpos = i; }
+    }
+    let T0 = maxpos;
+    const x1 = c[T0-1] || 0, x2 = c[T0], x3 = c[T0+1] || 0;
+    const a = (x1 + x3 - 2*x2)/2;
+    const b = (x3 - x1)/2;
+    if (a) T0 = T0 - b/(2*a);
+    return sampleRate / T0;
+  }
+
+  let lastHz = 0;
+  function smooth(val, alpha){
+    if (!lastHz) { lastHz = val; return val; }
+    lastHz = alpha*val + (1-alpha)*lastHz;
+    return lastHz;
+  }
+
+  async function startTuner(){
+    try{
+      tunerStream = await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false, noiseSuppression:false, autoGainControl:false}});
+    }catch(e){
+      alert('Não foi possível acessar o microfone. Verifique permissões e HTTPS/localhost.'); return;
+    }
+    const actx = new (window.AudioContext || window.webkitAudioContext)();
+    tunerSource = actx.createMediaStreamSource(tunerStream);
+    tunerAnalyser = actx.createAnalyser();
+    tunerAnalyser.fftSize = 2048;
+    tunerSource.connect(tunerAnalyser);
+    tunerBuf = new Uint8Array(tunerAnalyser.fftSize);
+
+    tunerStartBtn.disabled = true; tunerStopBtn.disabled = false;
+
+    function loop(){
+      tunerAnalyser.getByteTimeDomainData(tunerBuf);
+      let hz = autoCorrelate(tunerBuf, actx.sampleRate);
+      const alpha = parseFloat(tunerSmoothEl.value);
+      if (hz > 0) hz = smooth(hz, alpha);
+      if (hz > 0 && hz < 2000){
+        const A4 = parseFloat(calibA4El.value) || 440;
+        const nf = noteFromFrequency(hz, A4);
+        tunerFreqEl.textContent = hz.toFixed(2);
+        tunerNoteEl.textContent = nf.name;
+        tunerCentsEl.textContent = nf.cents.toFixed(1);
+        const clamped = Math.max(-50, Math.min(50, nf.cents));
+        const deg = clamped * 0.9;
+        tunerNeedle.style.transform = `translateX(-50%) rotate(${deg}deg)`;
+      } else {
+        tunerFreqEl.textContent = '--';
+        tunerNoteEl.textContent = '--';
+        tunerCentsEl.textContent = '--';
+      }
+      tunerRAF = requestAnimationFrame(loop);
+    }
+    tunerRAF = requestAnimationFrame(loop);
+  }
+
+  function stopTuner(){
+    tunerStartBtn.disabled = false; tunerStopBtn.disabled = true;
+    cancelAnimationFrame(tunerRAF);
+    if (tunerStream){
+      tunerStream.getTracks().forEach(t=>t.stop());
+      tunerStream = null;
+    }
+  }
+
+  document.getElementById('tunerStart').addEventListener('click', startTuner);
+  document.getElementById('tunerStop').addEventListener('click', stopTuner);
+})();
+</script>
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function() {
+    navigator.serviceWorker.register('sw.js').catch(console.error);
+  });
+}
+</script>
+</body>
+</html>
